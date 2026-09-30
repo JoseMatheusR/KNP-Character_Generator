@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -6,6 +6,7 @@ import {
   Modal,
   PanResponder,
   Platform,
+  type GestureResponderHandlers,
   Pressable,
   Text,
   View,
@@ -17,10 +18,68 @@ import { GUEST_USER_ID } from "@/src/domain/constants";
 import { ARCHETYPES } from "@/src/domain/gameData";
 import { generateRandomCharacter } from "@/src/domain/randomCharacter";
 import { exportCharacterPdf } from "@/src/lib/exportCharacterPdf";
+import { restoreArchiveBackup, shareArchiveBackup } from "@/src/lib/archiveBackupFile";
+import type { Character } from "@/src/domain/character";
 import type { CharacterFolder, StoredCharacter } from "@/src/domain/auth";
+import { CharacterQrModal } from "@/src/components/sheet/CharacterQrModal";
+import { CharacterQrScanner } from "@/src/components/sheet/CharacterQrScanner";
+import { addMissingHomebrew } from "@/src/storage/homebrew";
 import { Button } from "@/src/components/ui/Button";
 import { Input } from "@/src/components/ui/Input";
 import { Card, Screen, SectionHeading } from "@/src/components/ui/Screen";
+
+function FolderChevron({ expanded }: { expanded: boolean }) {
+  const [turn] = useState(() => new Animated.Value(expanded ? 1 : 0));
+
+  useEffect(() => {
+    Animated.timing(turn, {
+      toValue: expanded ? 1 : 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  }, [expanded, turn]);
+
+  return (
+    <Animated.View style={{ transform: [{ rotate: turn.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "90deg"] }) }] }}>
+      <Text className="text-sm text-sand">›</Text>
+    </Animated.View>
+  );
+}
+
+function FolderBody({ expanded, children }: { expanded: boolean; children: ReactNode }) {
+  const [progress] = useState(() => new Animated.Value(expanded ? 1 : 0));
+  const [contentHeight, setContentHeight] = useState(0);
+
+  useEffect(() => {
+    Animated.timing(progress, {
+      toValue: expanded ? 1 : 0,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+  }, [expanded, progress]);
+
+  return (
+    <Animated.View
+      style={{
+        height: progress.interpolate({ inputRange: [0, 1], outputRange: [0, contentHeight] }),
+        opacity: progress.interpolate({ inputRange: [0, 0.35, 1], outputRange: [0, 0, 1] }),
+        overflow: "hidden",
+        pointerEvents: expanded ? "auto" : "none",
+      }}
+    >
+      <View
+        className="absolute left-0 right-0 gap-2 border-t border-border pt-3"
+        onLayout={(event) => {
+          const height = Math.ceil(event.nativeEvent.layout.height);
+          if (height <= 0) return;
+          setContentHeight((current) => (Math.abs(height - current) < 2 ? current : height));
+        }}
+      >
+        {children}
+      </View>
+    </Animated.View>
+  );
+}
 
 export default function DashboardScreen() {
   const store = useCharacterStore(GUEST_USER_ID);
@@ -31,6 +90,12 @@ export default function DashboardScreen() {
   const [editingFolder, setEditingFolder] = useState<string | null>(null);
   const [editFolderName, setEditFolderName] = useState("");
   const [pickingFolder, setPickingFolder] = useState(false);
+  const [qrCharacter, setQrCharacter] = useState<Character | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [toolHandlers, setToolHandlers] = useState<GestureResponderHandlers | null>(null);
+  const [toolsReveal] = useState(() => new Animated.Value(0));
+  const toolsDrag = useRef({ value: 0, grant: 0, max: 0, dragging: false });
   const insets = useSafeAreaInsets();
   const [translateY] = useState(() => new Animated.Value(520));
 
@@ -67,6 +132,53 @@ export default function DashboardScreen() {
       }),
     [closeActions, translateY]
   );
+
+  useEffect(() => {
+    const drag = toolsDrag.current;
+    const id = toolsReveal.addListener(({ value }) => {
+      drag.value = value;
+    });
+    setToolHandlers(
+      PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > Math.abs(gesture.dx),
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => {
+        toolsReveal.stopAnimation();
+        drag.dragging = true;
+        drag.grant = drag.value;
+      },
+      onPanResponderMove: (_, gesture) => {
+        const next = Math.min(drag.max, Math.max(0, drag.grant + gesture.dy));
+        drag.value = next;
+        toolsReveal.setValue(next);
+      },
+      onPanResponderRelease: (_, gesture) => {
+        drag.dragging = false;
+        const current = Math.min(drag.max, Math.max(0, drag.grant + gesture.dy));
+        const tapped = Math.abs(gesture.dy) < 6 && Math.abs(gesture.dx) < 6;
+        const open = tapped
+          ? drag.grant < drag.max / 2
+          : gesture.vy > 0.6
+            ? true
+            : gesture.vy < -0.6
+              ? false
+              : current > drag.max * 0.5;
+        const destination = open ? drag.max : 0;
+        setToolsOpen(open);
+        Animated.timing(toolsReveal, {
+          toValue: destination,
+          duration: 160,
+          useNativeDriver: false,
+        }).start();
+      },
+      onPanResponderTerminate: () => {
+        drag.dragging = false;
+      },
+    }).panHandlers
+    );
+    return () => toolsReveal.removeListener(id);
+  }, [toolsReveal]);
 
   useEffect(() => {
     if (!actionsFor) return;
@@ -132,11 +244,11 @@ export default function DashboardScreen() {
     </View>
   );
 
-  const FolderSection = ({ folder }: { folder: CharacterFolder }) => {
+  const renderFolder = (folder: CharacterFolder) => {
     const folderChars = store.characters.filter((c) => c.folderId === folder.id);
     const isExpanded = expandedFolders.has(folder.id);
     return (
-      <Card className="gap-3 p-3">
+      <Card key={folder.id} className="gap-3 p-3">
         <View className="flex-row items-center gap-2">
           <Pressable
             accessibilityRole="button"
@@ -145,7 +257,7 @@ export default function DashboardScreen() {
             className="min-h-[48px] flex-1 flex-row items-center gap-3 px-1"
           >
             <View className="h-9 w-9 items-center justify-center border border-primary bg-primary-soft">
-              <Text className="text-sm text-sand">{isExpanded ? "⌄" : "›"}</Text>
+              <FolderChevron expanded={isExpanded} />
             </View>
             {editingFolder === folder.id ? (
               <Input
@@ -177,11 +289,9 @@ export default function DashboardScreen() {
             <Text className="font-mono text-xs font-bold text-sand">+ NOVO</Text>
           </Pressable>
         </View>
-        {isExpanded && (
-          <View className="gap-2 border-t border-border pt-3">
-            {folderChars.length === 0 ? <EmptyFolder /> : folderChars.map((c) => <CharCard key={c.id} char={c} />)}
-          </View>
-        )}
+        <FolderBody expanded={isExpanded}>
+          {folderChars.length === 0 ? <EmptyFolder /> : folderChars.map((c) => <CharCard key={c.id} char={c} />)}
+        </FolderBody>
       </Card>
     );
   };
@@ -221,7 +331,87 @@ export default function DashboardScreen() {
       </View>
       <View className="flex-row gap-2">
         <Button className="flex-1" label="+ Nova pasta" variant="outline" onPress={() => setShowNewFolder(true)} />
-        <Button className="flex-1" label="Homebrew" variant="outline" onPress={() => router.push("/homebrew")} />
+        <Button
+          className="flex-1"
+          label="Importar QR"
+          variant="outline"
+          onPress={() => {
+            if (Platform.OS === "web") {
+              Alert.alert(
+                "Importar no celular",
+                "A leitura do QR funciona no app do Android ou iOS. No navegador, mostre o QR de uma ficha para o outro celular escanear."
+              );
+              return;
+            }
+            setScanning(true);
+          }}
+        />
+      </View>
+      <Animated.View style={{ height: toolsReveal, overflow: "hidden", pointerEvents: toolsOpen ? "auto" : "none" }}>
+        <View
+          className="absolute left-0 right-0 gap-2 pb-2"
+          onLayout={(event) => {
+            const height = Math.ceil(event.nativeEvent.layout.height);
+            const drag = toolsDrag.current;
+            if (height <= 0 || Math.abs(height - drag.max) < 2 || drag.dragging) return;
+            drag.max = height;
+            if (drag.value > 0) {
+              drag.value = height;
+              toolsReveal.setValue(height);
+            }
+          }}
+        >
+          <Button label="Homebrew" variant="outline" onPress={() => router.push("/homebrew")} />
+          <View className="flex-row gap-2">
+            <Button
+              className="flex-1"
+              label="Backup"
+              variant="outline"
+              onPress={async () => {
+                try {
+                  await shareArchiveBackup();
+                } catch (error) {
+                  const message = error instanceof Error ? error.message : "Tente de novo.";
+                  Alert.alert("Não foi possível salvar o backup", message);
+                }
+              }}
+            />
+            <Button
+              className="flex-1"
+              label="Restaurar"
+              variant="outline"
+              onPress={async () => {
+                try {
+                  const restored = await restoreArchiveBackup(GUEST_USER_ID);
+                  if (!restored) return;
+                  await store.refresh();
+                  const total = restored.addedCharacters + restored.addedFolders + restored.addedHomebrew;
+                  Alert.alert(
+                    total === 0 ? "Nada novo" : "Backup restaurado",
+                    total === 0
+                      ? "Essas fichas já estão neste aparelho."
+                      : `${restored.addedCharacters} fichas, ${restored.addedFolders} pastas e ${restored.addedHomebrew} homebrews acrescentados. O que já existia permanece.`
+                  );
+                } catch (error) {
+                  const message = error instanceof Error ? error.message : "Tente de novo.";
+                  Alert.alert("Não foi possível restaurar", message);
+                }
+              }}
+            />
+          </View>
+        </View>
+      </Animated.View>
+      <View
+        {...toolHandlers}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: toolsOpen }}
+        className="items-center py-2"
+        style={Platform.OS === "web" ? { touchAction: "none" } : undefined}
+      >
+        <View className="mb-1 h-1 w-10 bg-primary" />
+        <Text className="font-mono text-xs text-muted-foreground">
+          {toolsOpen ? "Puxe para cima para fechar" : "Puxe para ferramentas"}
+        </Text>
       </View>
 
       {showNewFolder && (
@@ -255,7 +445,7 @@ export default function DashboardScreen() {
       {store.folders.length > 0 ? (
         <View className="gap-3">
           <SectionHeading title="Pastas" />
-          {store.folders.map((f) => <FolderSection key={f.id} folder={f} />)}
+          {store.folders.map((folder) => renderFolder(folder))}
         </View>
       ) : null}
 
@@ -345,6 +535,15 @@ export default function DashboardScreen() {
             <>
             <Button label="Abrir ficha" onPress={() => { router.push(`/sheet/${actionsFor!.id}`); closeActions(); }} />
             <Button
+              label="Compartilhar QR"
+              variant="outline"
+              onPress={() => {
+                if (!actionsFor) return;
+                setQrCharacter(actionsFor.data);
+                closeActions();
+              }}
+            />
+            <Button
               label="Exportar PDF"
               variant="outline"
               onPress={async () => {
@@ -407,6 +606,20 @@ export default function DashboardScreen() {
           </Animated.View>
         </View>
       </Modal>
+      <CharacterQrModal character={qrCharacter} onClose={() => setQrCharacter(null)} />
+      <CharacterQrScanner
+        visible={scanning}
+        onClose={() => setScanning(false)}
+        onImport={async ({ character, homebrew }) => {
+          setScanning(false);
+          const addedHomebrew = await addMissingHomebrew(homebrew);
+          await store.addCharacter(character, null);
+          Alert.alert(
+            "Ficha importada",
+            addedHomebrew > 0 ? `${character.name}\n${addedHomebrew} homebrew incluído.` : character.name
+          );
+        }}
+      />
     </Screen>
   );
 }

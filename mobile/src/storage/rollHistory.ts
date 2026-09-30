@@ -12,19 +12,28 @@ export interface RollEntry {
   d2: number;
   total: number;
   result: RollResult;
+  attribute?: string;
+  modifier?: number;
 }
 
 export async function loadRollHistory(): Promise<RollEntry[]> {
   return loadJson<RollEntry[]>(ROLL_HISTORY_KEY, []);
 }
 
-export async function addRoll(d1: number, d2: number): Promise<RollEntry> {
-  const total = d1 + d2;
+export async function addRoll(
+  d1: number,
+  d2: number,
+  details?: { attribute?: string; modifier?: number }
+): Promise<RollEntry> {
+  const modifier = details?.modifier ?? 0;
+  const total = d1 + d2 + modifier;
   const entry: RollEntry = {
     id: randomId(),
     timestamp: Date.now(),
     d1,
     d2,
+    modifier,
+    attribute: details?.attribute,
     total,
     result: rollResultFromTotal(total),
   };

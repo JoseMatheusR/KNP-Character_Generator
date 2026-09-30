@@ -6,7 +6,7 @@ export interface HomebrewSkill {
   id: string;
   name: string;
   description: string;
-  type: "specific" | "combat-attack" | "combat-evade" | "combat-defend";
+  type: "specific" | "combat-attack" | "combat-evade" | "combat-defend" | "combat-heal";
   archetypeId?: string;
 }
 
@@ -29,4 +29,20 @@ export async function updateHomebrew(id: string, data: Partial<Omit<HomebrewSkil
 export async function removeHomebrew(id: string): Promise<void> {
   const all = (await loadHomebrew()).filter((i) => i.id !== id);
   await saveJson(HOMEBREW_KEY, all);
+}
+
+export async function addMissingHomebrew(items: Omit<HomebrewSkill, "id">[]): Promise<number> {
+  const existing = await loadHomebrew();
+  const fresh = items.filter(
+    (item) =>
+      !existing.some(
+        (current) =>
+          current.name === item.name &&
+          current.type === item.type &&
+          (current.archetypeId ?? "") === (item.archetypeId ?? "")
+      )
+  );
+  if (fresh.length === 0) return 0;
+  await saveJson(HOMEBREW_KEY, [...existing, ...fresh.map((item) => ({ ...item, id: randomId() }))]);
+  return fresh.length;
 }
