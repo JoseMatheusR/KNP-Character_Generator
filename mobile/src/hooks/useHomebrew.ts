@@ -52,7 +52,7 @@ export function useHomebrew() {
   );
 
   const getCombatTechniques = useCallback(
-    (category: "attack" | "evade" | "defend") =>
+    (category: "attack" | "defend" | "evade" | "heal") =>
       items.filter((i) => i.type === `combat-${category}`),
     [items]
   );

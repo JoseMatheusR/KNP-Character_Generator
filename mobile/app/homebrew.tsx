@@ -13,6 +13,7 @@ const TYPES: { value: HomebrewSkill["type"]; label: string }[] = [
   { value: "combat-attack", label: "Atacar" },
   { value: "combat-evade", label: "Evadir" },
   { value: "combat-defend", label: "Defender" },
+  { value: "combat-heal", label: "Curar" },
 ];
 
 export default function HomebrewScreen() {

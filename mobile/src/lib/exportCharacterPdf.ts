@@ -83,8 +83,16 @@ export function buildCharacterHtml(
       character.combatTechniques.evade,
       character.extraEvadeTechnique,
       ...granted.filter((item) => item.category === "evade").map((item) => item.name),
+      ...(character.extraTechnique?.category === "evade" ? [character.extraTechnique.name] : []),
+    ].filter((name): name is string => !!name),
+    heal: [
+      character.combatTechniques.heal,
+      ...granted.filter((item) => item.category === "heal").map((item) => item.name),
+      ...(character.extraTechnique?.category === "heal" ? [character.extraTechnique.name] : []),
     ].filter((name): name is string => !!name),
   };
+  techniques.attack.push(...(character.extraTechnique?.category === "attack" ? [character.extraTechnique.name] : []));
+  techniques.defend.push(...(character.extraTechnique?.category === "defend" ? [character.extraTechnique.name] : []));
   const techniqueBox = (names: string[], className: string) => `
     <div class="technique-name ${className}-name">${names.map(escapeHtml).join(" + ")}</div>
     <div class="technique-description ${className}-description">
@@ -128,11 +136,12 @@ export function buildCharacterHtml(
   .described-item strong { display: block; font-size: 1.08em; }
   .described-item span { display: block; margin-top: 0.7mm; }
   .notes { position: absolute; left: 10%; top: 75.7%; width: 80%; height: 16.7%; overflow: hidden; padding: 2mm; font-size: 12pt; line-height: 1.3; z-index: 1; }
-  .technique-name { position: absolute; left: 48.4%; width: 39.2%; height: 3.2%; overflow: hidden; padding: 0.4mm 2mm; font-size: 12pt; font-weight: 700; white-space: nowrap; z-index: 1; }
-  .technique-description { position: absolute; left: 11.1%; width: 77.5%; height: 12.2%; overflow: hidden; padding: 2mm; font-size: 10.5pt; line-height: 1.25; z-index: 1; }
-  .attack-name { top: 24.05%; } .attack-description { top: 27.0%; }
-  .defend-name { top: 42.35%; } .defend-description { top: 45.3%; }
-  .evade-name { top: 60.65%; } .evade-description { top: 63.6%; }
+  .technique-name { position: absolute; left: 48.4%; width: 39.2%; height: 2.5%; overflow: hidden; padding: 0.3mm 2mm; font-size: 10pt; font-weight: 700; white-space: nowrap; z-index: 1; }
+  .technique-description { position: absolute; left: 11.1%; width: 77.5%; height: 12.4%; overflow: hidden; padding: 1.4mm 2mm; font-size: 9pt; line-height: 1.2; z-index: 1; }
+  .attack-name { top: 24.0%; } .attack-description { top: 26.7%; }
+  .defend-name { top: 41.8%; } .defend-description { top: 44.5%; }
+  .evade-name { top: 59.9%; } .evade-description { top: 62.6%; }
+  .heal-name { top: 77.8%; } .heal-description { top: 80.5%; }
   .condition-notes { left: 8.8%; top: 77.5%; width: 44.5%; height: 15.2%; font-size: 11pt; }
 </style></head><body>
   <section class="page page-1">
@@ -154,6 +163,7 @@ export function buildCharacterHtml(
     ${techniqueBox(techniques.attack, "attack")}
     ${techniqueBox(techniques.defend, "defend")}
     ${techniqueBox(techniques.evade, "evade")}
+    ${techniqueBox(techniques.heal, "heal")}
   </section>
   <section class="page">
     <img class="background" src="${pageSources[2]}" />

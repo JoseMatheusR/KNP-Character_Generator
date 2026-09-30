@@ -1,18 +1,20 @@
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, Text, View, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ARCHETYPES, SPECIFIC_SKILLS, COMBAT_TECHNIQUES } from "@/src/domain/gameData";
+import { ARCHETYPES, SPECIFIC_SKILLS, COMBAT_TECHNIQUES, TECHNIQUE_CATEGORIES, canSpendAttributePoint } from "@/src/domain/gameData";
 import { COMBAT_TECHNIQUE_DESCRIPTIONS, SPECIFIC_SKILL_DESCRIPTIONS } from "@/src/domain/skillDescriptions";
 import {
   borrowedSkillOptions,
   extraEvadeOptions,
+  extraTechniqueOptions,
   grantedTechniques,
   needsBorrowedSkill,
   needsExtraEvade,
+  needsExtraTechnique,
   normalizeCharacterBuild,
 } from "@/src/domain/characterBuild";
 import { isValidBonusDistribution } from "@/src/domain/characterRules";
-import type { Attributes, Character, AttributeKey } from "@/src/domain/character";
+import type { Attributes, Character, AttributeKey, ExtraTechnique, TechniqueCategory } from "@/src/domain/character";
 import { Button } from "@/src/components/ui/Button";
 import { Input } from "@/src/components/ui/Input";
 import { PatternBand } from "@/src/components/ui/Screen";
@@ -37,7 +39,8 @@ export function CreationWizard({ onComplete, onCancel }: Props) {
   const [specificSkill, setSpecificSkill] = useState("");
   const [borrowedSkill, setBorrowedSkill] = useState<string | null>(null);
   const [extraEvadeTechnique, setExtraEvadeTechnique] = useState<string | null>(null);
-  const [techniques, setTechniques] = useState({ attack: "", evade: "", defend: "" });
+  const [extraTechnique, setExtraTechnique] = useState<ExtraTechnique | null>(null);
+  const [techniques, setTechniques] = useState({ attack: "", evade: "", defend: "", heal: "" });
 
   const archetype = ARCHETYPES.find((a) => a.id === archetypeId);
   const spentPoints = Object.values(bonusAttributes).reduce((sum, value) => sum + value, 0);
@@ -52,14 +55,18 @@ export function CreationWizard({ onComplete, onCancel }: Props) {
         return isValidBonusDistribution(bonusAttributes);
       case 4:
         return !!specificSkill && (!needsBorrowedSkill(specificSkill) || !!borrowedSkill);
-      case 5:
+      case 5: {
+        const build = { archetypeSkill: archetype?.skill ?? "", specificSkill, borrowedSkill };
         return (
           !!techniques.attack &&
           !!techniques.evade &&
           !!techniques.defend &&
-          (!needsExtraEvade({ archetypeSkill: archetype?.skill ?? "", specificSkill, borrowedSkill }) ||
-            (!!extraEvadeTechnique && extraEvadeTechnique !== techniques.evade))
+          !!techniques.heal &&
+          (!needsExtraEvade(build) || (!!extraEvadeTechnique && extraEvadeTechnique !== techniques.evade)) &&
+          (!needsExtraTechnique(build) ||
+            (!!extraTechnique?.name && extraTechnique.name !== techniques[extraTechnique.category]))
         );
+      }
       default:
         return false;
     }
@@ -80,6 +87,7 @@ export function CreationWizard({ onComplete, onCancel }: Props) {
       specificSkill,
       borrowedSkill,
       extraEvadeTechnique,
+      extraTechnique,
       combatTechniques: { ...techniques },
       damageMarkers: [],
       negativeConditions: [],
@@ -91,10 +99,10 @@ export function CreationWizard({ onComplete, onCancel }: Props) {
 
   const adjustBonus = (key: AttributeKey, delta: number) => {
     setBonusAttributes((prev) => {
+      if (!archetype) return prev;
+      if (delta > 0 && !canSpendAttributePoint(archetype.attributes, prev, key)) return prev;
       const next = { ...prev, [key]: prev[key] + delta };
-      if (next[key] < 0 || next[key] > 2) return prev;
-      const sum = Object.values(next).reduce((s, v) => s + v, 0);
-      if (sum > 2) return prev;
+      if (next[key] < 0) return prev;
       return next;
     });
   };
@@ -104,7 +112,7 @@ export function CreationWizard({ onComplete, onCancel }: Props) {
     ...brew.getSpecificSkills(archetypeId).map((s) => s.name),
   ];
 
-  const renderTechniques = (cat: "attack" | "evade" | "defend") => {
+  const renderTechniques = (cat: TechniqueCategory) => {
     const cfg = COMBAT_TECHNIQUES[cat];
     const homebrew = brew.getCombatTechniques(cat);
     const options = [...cfg.options, ...homebrew.map((s) => s.name)];
@@ -121,6 +129,7 @@ export function CreationWizard({ onComplete, onCancel }: Props) {
                 if (cat === "evade") {
                   setExtraEvadeTechnique((current) => (current === opt ? null : current));
                 }
+                setExtraTechnique((current) => (current?.category === cat && current.name === opt ? null : current));
               }}
               className={cn(
                 "min-h-[56px] border px-4 py-3",
@@ -178,7 +187,7 @@ export function CreationWizard({ onComplete, onCancel }: Props) {
               </Text>
             </View>
             <Input placeholder="Nome do personagem" value={name} onChangeText={setName} />
-            <Input placeholder="Origem (opcional)" value={origin} onChangeText={setOrigin} />
+            <Input placeholder="Origem e conceito" value={origin} onChangeText={setOrigin} />
           </View>
         )}
 
@@ -199,6 +208,7 @@ export function CreationWizard({ onComplete, onCancel }: Props) {
                   setSpecificSkill("");
                   setBorrowedSkill(null);
                   setExtraEvadeTechnique(null);
+                  setExtraTechnique(null);
                 }}
                 className={cn(
                   "border p-4",
@@ -222,7 +232,7 @@ export function CreationWizard({ onComplete, onCancel }: Props) {
             <View className="mb-1 gap-1">
               <Text className="font-display text-2xl font-bold text-foreground">{"> DISTRIBUIR_BÔNUS"}</Text>
               <Text className="font-mono text-sm leading-5 text-muted-foreground">
-                Use exatamente 2 pontos, com no máximo +2 em cada atributo.
+                Use exatamente 2 pontos. O atributo final não passa de +3, e nenhum ponto sobe mais que +2.
               </Text>
             </View>
             <View className="flex-row items-center gap-2 border border-border bg-card px-3 py-3">
@@ -358,7 +368,7 @@ export function CreationWizard({ onComplete, onCancel }: Props) {
             }).map((technique) => (
               <View key={technique.name} className="mb-4 border border-accent bg-card px-4 py-3">
                 <Text className="font-mono text-[10px] font-bold uppercase tracking-wider text-accent">
-                  Concedida · {technique.category === "evade" ? "Evadir e Observar" : "Defender e Manobrar"}
+                  Concedida · {COMBAT_TECHNIQUES[technique.category].label}
                 </Text>
                 <Text className="mt-1 font-mono text-sm text-foreground">{technique.name}</Text>
                 <Text className="mt-2 font-mono text-xs leading-5 text-muted-foreground">
@@ -392,6 +402,46 @@ export function CreationWizard({ onComplete, onCancel }: Props) {
               </View>
             ) : null}
             {renderTechniques("defend")}
+            {renderTechniques("heal")}
+            {needsExtraTechnique({ archetypeSkill: archetype?.skill ?? "", specificSkill, borrowedSkill }) ? (
+              <View className="mb-4 gap-2">
+                <Text className="font-display text-sm font-bold text-foreground">Kryptônia · técnica extra</Text>
+                <Text className="font-mono text-xs leading-5 text-muted-foreground">
+                  Escolha mais uma técnica de qualquer tipo, diferente da que você já escolheu nessa ação.
+                </Text>
+                <View className="flex-row flex-wrap gap-2">
+                  {TECHNIQUE_CATEGORIES.map((category) => (
+                    <Pressable
+                      key={category}
+                      onPress={() => setExtraTechnique({ category, name: "" })}
+                      className={cn(
+                        "border px-3 py-2",
+                        extraTechnique?.category === category ? "border-primary bg-primary-soft" : "border-border bg-card"
+                      )}
+                    >
+                      <Text className="font-mono text-xs text-foreground">{COMBAT_TECHNIQUES[category].label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+                {extraTechnique
+                  ? extraTechniqueOptions(extraTechnique.category, techniques[extraTechnique.category]).map((opt) => (
+                      <Pressable
+                        key={opt}
+                        onPress={() => setExtraTechnique({ category: extraTechnique.category, name: opt })}
+                        className={cn(
+                          "border px-4 py-3",
+                          extraTechnique.name === opt ? "border-primary bg-primary-soft" : "border-border bg-card"
+                        )}
+                      >
+                        <Text className="font-mono text-sm text-foreground">{extraTechnique.name === opt ? "■ " : "□ "}{opt}</Text>
+                        <Text className="mt-2 font-mono text-xs leading-5 text-muted-foreground">
+                          {COMBAT_TECHNIQUE_DESCRIPTIONS[opt]}
+                        </Text>
+                      </Pressable>
+                    ))
+                  : null}
+              </View>
+            ) : null}
           </View>
         )}
         </View>

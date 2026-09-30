@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import type { Character } from "@/src/domain/character";
+import { normalizeCharacterBuild } from "@/src/domain/characterBuild";
 import { getDebuffs, getEffectiveAttributes } from "@/src/domain/characterRules";
 import * as charStorage from "@/src/storage/characters";
 
@@ -11,7 +12,7 @@ export function useCharacter(charId: string) {
   const reload = useCallback(async () => {
     setLoading(true);
     const stored = await charStorage.getCharacterById(charId);
-    setCharacter(stored?.data ?? null);
+    setCharacter(stored ? normalizeCharacterBuild(stored.data) : null);
     setLoading(false);
   }, [charId]);
 
@@ -23,8 +24,9 @@ export function useCharacter(charId: string) {
 
   const saveCharacter = useCallback(
     async (data: Character) => {
-      setCharacter(data);
-      await charStorage.updateCharacterData(charId, data);
+      const next = normalizeCharacterBuild(data);
+      setCharacter(next);
+      await charStorage.updateCharacterData(charId, next);
     },
     [charId]
   );

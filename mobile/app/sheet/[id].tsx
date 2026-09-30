@@ -6,19 +6,23 @@ import {
   ARCHETYPES,
   ATTRIBUTE_LABELS,
   COMBAT_TECHNIQUES,
+  TECHNIQUE_CATEGORIES,
   DAMAGE_TYPES,
   NEGATIVE_CONDITIONS,
   COMBAT_CONDITIONS,
   POSITIVE_CONDITIONS,
+  type ConditionEffect,
   SPECIFIC_SKILLS,
 } from "@/src/domain/gameData";
 import type { AttributeKey } from "@/src/domain/character";
 import {
   borrowedSkillOptions,
   extraEvadeOptions,
+  extraTechniqueOptions,
   grantedTechniques,
   needsBorrowedSkill,
   needsExtraEvade,
+  needsExtraTechnique,
   normalizeCharacterBuild,
 } from "@/src/domain/characterBuild";
 import { getBuiltAttributes } from "@/src/domain/characterRules";
@@ -140,28 +144,35 @@ export default function SheetScreen() {
 
   const conditionBlock = (
     title: string,
-    items: string[],
+    items: ConditionEffect[],
     type: "negativeConditions" | "combatConditions" | "positiveConditions"
   ) => (
     <View className="gap-2">
       <Text className="font-display text-xs font-bold uppercase tracking-wider text-muted-foreground">{title}</Text>
       <View className="flex-row flex-wrap gap-2">
         {items.map((item) => {
-          const on = character[type].includes(item);
+          const on = character[type].includes(item.label);
           return (
             <Pressable
-              key={item}
-              onPress={() => toggleCondition(type, item)}
+              key={item.label}
+              onPress={() => toggleCondition(type, item.label)}
               className={cn(
                 "min-h-[40px] justify-center border px-3 py-2",
                 on ? "border-primary bg-primary-soft" : "border-border bg-card-strong"
               )}
             >
-              <Text className={cn("font-mono text-xs", on ? "text-sand" : "text-foreground")}>{item}</Text>
+              <Text className={cn("font-mono text-xs", on ? "text-sand" : "text-foreground")}>{item.label}</Text>
             </Pressable>
           );
         })}
       </View>
+      {items
+        .filter((item) => character[type].includes(item.label))
+        .map((item) => (
+          <Text key={`${item.label}-efeito`} className="font-mono text-xs leading-5 text-muted-foreground">
+            {item.label}: {item.description}
+          </Text>
+        ))}
     </View>
   );
 
@@ -252,7 +263,7 @@ export default function SheetScreen() {
         </Text>
       </Pressable>
 
-      <DiceRoller />
+      <DiceRoller attributes={effective} conditions={activeConditions} />
       </View>
       ) : null}
 
@@ -262,11 +273,15 @@ export default function SheetScreen() {
         <SectionHeading title="Técnicas" description="As que este agente pode usar, com o texto." />
         {[
           { category: COMBAT_TECHNIQUES.attack.label, name: character.combatTechniques.attack },
+          { category: COMBAT_TECHNIQUES.defend.label, name: character.combatTechniques.defend },
           { category: COMBAT_TECHNIQUES.evade.label, name: character.combatTechniques.evade },
           ...(character.extraEvadeTechnique
             ? [{ category: "Evadir e Observar · extra", name: character.extraEvadeTechnique }]
             : []),
-          { category: COMBAT_TECHNIQUES.defend.label, name: character.combatTechniques.defend },
+          { category: COMBAT_TECHNIQUES.heal.label, name: character.combatTechniques.heal },
+          ...(character.extraTechnique?.name
+            ? [{ category: `${COMBAT_TECHNIQUES[character.extraTechnique.category].label} · extra`, name: character.extraTechnique.name }]
+            : []),
           ...grantedTechniques(character).map((technique) => ({ category: "Concedida", name: technique.name })),
         ].map((item) => {
           const description =
@@ -345,6 +360,21 @@ export default function SheetScreen() {
             </View>
           </View>
         ) : null}
+        <Text className="font-mono text-xs font-bold uppercase tracking-wider text-muted-foreground">Curar e Restaurar</Text>
+        <View className="flex-row flex-wrap gap-2">
+          {COMBAT_TECHNIQUES.heal.options.map((opt) => (
+            <Pressable
+              key={opt}
+              onPress={() => saveCharacter({ ...character, combatTechniques: { ...character.combatTechniques, heal: opt } })}
+              className={cn(
+                "min-h-[40px] justify-center border px-3 py-2",
+                character.combatTechniques.heal === opt ? "border-accent bg-card-strong" : "border-border"
+              )}
+            >
+              <Text className={cn("font-mono text-xs", character.combatTechniques.heal === opt ? "text-accent" : "text-foreground")}>{opt}</Text>
+            </Pressable>
+          ))}
+        </View>
         {needsExtraEvade(character) ? (
           <View className="gap-2">
             <Text className="font-mono text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -366,6 +396,43 @@ export default function SheetScreen() {
             </View>
           </View>
         ) : null}
+        {needsExtraTechnique(character) ? (
+          <View className="gap-2">
+            <Text className="font-mono text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Kryptônia · técnica extra
+            </Text>
+            {TECHNIQUE_CATEGORIES.map((category) => (
+              <View key={category} className="gap-2">
+                <Text className="font-mono text-[10px] uppercase text-muted-foreground">{COMBAT_TECHNIQUES[category].label}</Text>
+                <View className="flex-row flex-wrap gap-2">
+                  {extraTechniqueOptions(category, character.combatTechniques[category]).map((opt) => (
+                    <Pressable
+                      key={opt}
+                      onPress={() => saveCharacter({ ...character, extraTechnique: { category, name: opt } })}
+                      className={cn(
+                        "min-h-[40px] justify-center border px-3 py-2",
+                        character.extraTechnique?.category === category && character.extraTechnique.name === opt
+                          ? "border-accent bg-card-strong"
+                          : "border-border"
+                      )}
+                    >
+                      <Text
+                        className={cn(
+                          "font-mono text-xs",
+                          character.extraTechnique?.category === category && character.extraTechnique.name === opt
+                            ? "text-accent"
+                            : "text-foreground"
+                        )}
+                      >
+                        {opt}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : null}
       </Card>
       </View>
       ) : null}
@@ -374,7 +441,7 @@ export default function SheetScreen() {
       <View className="gap-4">
       <Card className="gap-5">
         <SectionHeading title="Condições" description="Toque para ativar ou remover." />
-        {conditionBlock("Negativas", NEGATIVE_CONDITIONS.map((c) => c.label), "negativeConditions")}
+        {conditionBlock("Negativas", NEGATIVE_CONDITIONS, "negativeConditions")}
         {conditionBlock("Combate", COMBAT_CONDITIONS, "combatConditions")}
         {conditionBlock("Positivas", POSITIVE_CONDITIONS, "positiveConditions")}
       </Card>
