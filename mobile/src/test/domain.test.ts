@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { borrowedSkillOptions, grantedTechniques, harmoniaFromSkills, needsExtraEvade, needsExtraTechnique, vontadeFromSkills } from "@/src/domain/characterBuild";
 import { canSpendAttributePoint } from "@/src/domain/gameData";
-import { isValidBonusDistribution, getEffectiveAttributes } from "@/src/domain/characterRules";
+import { isValidBonusDistribution, getEffectiveAttributes, toggleSheetCondition } from "@/src/domain/characterRules";
 import { attributeRollModifier, rollResultFromTotal } from "@/src/domain/diceRules";
 import { buildArchive, mergeArchive, parseArchive } from "@/src/lib/archiveBackup";
 import { decodeCharacterQr, encodeCharacterQr } from "@/src/lib/characterQr";
@@ -61,6 +61,30 @@ describe("characterRules", () => {
     const fiel = { ...baseChar, specificSkill: "Reza Braba" };
     expect(vontadeFromSkills(fiel)).toBe(1);
     expect(getEffectiveAttributes(fiel).vontade).toBe(baseChar.baseAttributes.vontade + baseChar.bonusAttributes.vontade + 1 - 2);
+  });
+
+  it("replaces the opposite condition when a new one is marked", () => {
+    const angry = toggleSheetCondition(baseChar, "negativeConditions", "Raiva");
+    expect(angry.negativeConditions).toEqual(["Raiva"]);
+
+    const resolute = toggleSheetCondition(
+      { ...baseChar, negativeConditions: ["Insegurança", "Desconforto", "Medo"] },
+      "positiveConditions",
+      "Resoluto"
+    );
+    expect(resolute.negativeConditions).toEqual(["Medo"]);
+    expect(resolute.positiveConditions).toEqual(["Resoluto"]);
+
+    const compassionate = toggleSheetCondition(
+      { ...baseChar, negativeConditions: ["Raiva", "Paranoico"] },
+      "positiveConditions",
+      "Compassivo"
+    );
+    expect(compassionate.negativeConditions).toEqual([]);
+    expect(compassionate.positiveConditions).toEqual(["Compassivo"]);
+
+    const cleared = toggleSheetCondition(angry, "negativeConditions", "Raiva");
+    expect(cleared.negativeConditions).toEqual([]);
   });
 
   it("keeps a creation bonus inside the attribute limit of 3", () => {

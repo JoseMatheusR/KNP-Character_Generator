@@ -139,25 +139,68 @@ export const DAMAGE_TYPES = ["Impacto", "Sangramento", "Radiação", "Elétrico"
 export interface ConditionEffect {
   label: string;
   description: string;
+  overcome?: string;
   effects?: Partial<Attributes>;
 }
 
 export const NEGATIVE_CONDITIONS: ConditionEffect[] = [
-  { label: "Culpa", description: "-2 em Harmonia e Vontade.", effects: { harmonia: -2, vontade: -2 } },
-  { label: "Desconforto", description: "-2 em Foco e Criatividade.", effects: { foco: -2, criatividade: -2 } },
-  { label: "Insegurança", description: "-2 em Foco e Harmonia.", effects: { foco: -2, harmonia: -2 } },
-  { label: "Medo", description: "-2 em Vontade e Criatividade.", effects: { vontade: -2, criatividade: -2 } },
-  { label: "Raiva", description: "-1 em Foco, Harmonia e Vontade.", effects: { foco: -1, harmonia: -1, vontade: -1 } },
-  { label: "Entorpecido", description: "-2 em Foco e Vontade.", effects: { foco: -2, vontade: -2 } },
-  { label: "Paranoico", description: "-2 em Harmonia e Criatividade.", effects: { harmonia: -2, criatividade: -2 } },
+  {
+    label: "Culpa",
+    description: "-2 em Harmonia e Vontade.",
+    overcome: "Pague um preço significativo em nome de quem prejudicou.",
+    effects: { harmonia: -2, vontade: -2 },
+  },
+  {
+    label: "Desconforto",
+    description: "-2 em Foco e Criatividade.",
+    overcome: "Procure orientação e clareza de alguém capaz.",
+    effects: { foco: -2, criatividade: -2 },
+  },
+  {
+    label: "Insegurança",
+    description: "-2 em Foco e Harmonia.",
+    overcome: "Aja impulsivamente, colocando-se em perigo para provar a si mesmo.",
+    effects: { foco: -2, harmonia: -2 },
+  },
+  {
+    label: "Medo",
+    description: "-2 em Vontade e Criatividade.",
+    overcome: "Evite ou fuja de uma situação difícil ou perigosa.",
+    effects: { vontade: -2, criatividade: -2 },
+  },
+  {
+    label: "Raiva",
+    description: "-1 em Foco, Harmonia e Vontade.",
+    overcome: "Extravase destruindo algo de valor ou descontando em alguém.",
+    effects: { foco: -1, harmonia: -1, vontade: -1 },
+  },
+  {
+    label: "Entorpecido",
+    description: "-2 em Foco e Vontade.",
+    overcome: "Descanse, ou receba um estímulo ou dano forte o bastante para acordar.",
+    effects: { foco: -2, vontade: -2 },
+  },
+  {
+    label: "Paranoico",
+    description: "-2 em Harmonia e Criatividade.",
+    overcome: "Um medo precisa se provar falso, ou alguém precisa provar lealdade.",
+    effects: { harmonia: -2, criatividade: -2 },
+  },
   {
     label: "Obcecado",
     description: "-2 em todos os testes de ação que não estejam diretamente ligados ao objeto da sua obsessão.",
+    overcome: "Alcance o objetivo da obsessão, ou seja frustrado nele.",
   },
-  { label: "Apático", description: "-2 em Vontade e Criatividade.", effects: { vontade: -2, criatividade: -2 } },
+  {
+    label: "Apático",
+    description: "-2 em Vontade e Criatividade.",
+    overcome: "Testemunhe um feito extremo que reacenda a chama interior.",
+    effects: { vontade: -2, criatividade: -2 },
+  },
   {
     label: "Desesperado",
     description: "-1 em todos os atributos.",
+    overcome: "Um aliado adjacente gasta uma ação para dar um choque de realidade.",
     effects: { foco: -1, vontade: -1, harmonia: -1, criatividade: -1 },
   },
 ];

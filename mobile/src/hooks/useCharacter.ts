@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import type { Character } from "@/src/domain/character";
 import { normalizeCharacterBuild } from "@/src/domain/characterBuild";
-import { getDebuffs, getEffectiveAttributes } from "@/src/domain/characterRules";
+import { getDebuffs, getEffectiveAttributes, toggleSheetCondition } from "@/src/domain/characterRules";
 import * as charStorage from "@/src/storage/characters";
 
 export function useCharacter(charId: string) {
@@ -57,10 +57,7 @@ export function useCharacter(charId: string) {
       condition: string
     ) => {
       if (!character) return;
-      const list = character[type].includes(condition)
-        ? character[type].filter((c) => c !== condition)
-        : [...character[type], condition];
-      await saveCharacter({ ...character, [type]: list });
+      await saveCharacter(toggleSheetCondition(character, type, condition));
     },
     [character, saveCharacter]
   );

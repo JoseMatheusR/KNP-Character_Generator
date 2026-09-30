@@ -41,3 +41,34 @@ export function getEffectiveAttributes(character: Character): Attributes {
 export function isValidBonusDistribution(bonus: Attributes): boolean {
   return Object.values(bonus).reduce((s, v) => s + v, 0) === 2;
 }
+
+const CONDITION_LISTS = ["negativeConditions", "combatConditions", "positiveConditions"] as const;
+
+/** A condição nova substitui as opostas que o personagem já carrega. */
+const REPLACED_BY: Record<string, string[]> = {
+  Raiva: ["Medo"],
+  Resoluto: ["Insegurança", "Desconforto"],
+  Compassivo: ["Raiva", "Paranoico"],
+};
+
+export function conditionsReplacedBy(condition: string): string[] {
+  return REPLACED_BY[condition] ?? [];
+}
+
+export function toggleSheetCondition(
+  character: Character,
+  type: (typeof CONDITION_LISTS)[number],
+  condition: string
+): Character {
+  if (character[type].includes(condition)) {
+    return { ...character, [type]: character[type].filter((item) => item !== condition) };
+  }
+
+  const dropped = new Set(REPLACED_BY[condition] ?? []);
+  const next: Character = { ...character };
+  for (const list of CONDITION_LISTS) {
+    next[list] = character[list].filter((item) => !dropped.has(item));
+  }
+  next[type] = [...next[type], condition];
+  return next;
+}
