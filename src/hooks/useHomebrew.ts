@@ -4,7 +4,7 @@ export interface HomebrewSkill {
   id: string;
   name: string;
   description: string;
-  type: "specific" | "combat-attack" | "combat-evade" | "combat-defend";
+  type: "specific" | "combat-attack" | "combat-evade" | "combat-defend" | "combat-heal";
   archetypeId?: string; // only for specific skills
 }
 
@@ -46,7 +46,7 @@ export function useHomebrew() {
     return items.filter((i) => i.type === "specific" && (!archetypeId || !i.archetypeId || i.archetypeId === archetypeId));
   }, [items]);
 
-  const getCombatTechniques = useCallback((category: "attack" | "evade" | "defend") => {
+  const getCombatTechniques = useCallback((category: "attack" | "defend" | "evade" | "heal") => {
     return items.filter((i) => i.type === `combat-${category}`);
   }, [items]);
 

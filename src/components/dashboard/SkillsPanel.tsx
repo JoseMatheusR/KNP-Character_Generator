@@ -1,4 +1,5 @@
-import { ARCHETYPES, COMBAT_TECHNIQUES, SPECIFIC_SKILLS } from "@/data/gameData";
+import { ARCHETYPES, COMBAT_TECHNIQUES, SPECIFIC_SKILLS, TECHNIQUE_CATEGORIES } from "@/data/gameData";
+import type { TechniqueCategory } from "@/types/character";
 import { ARCHETYPE_SKILL_DESCRIPTIONS, SPECIFIC_SKILL_DESCRIPTIONS, COMBAT_TECHNIQUE_DESCRIPTIONS } from "@/data/skillDescriptions";
 import { useHomebrew } from "@/hooks/useHomebrew";
 import { useState } from "react";
@@ -8,10 +9,10 @@ interface Props {
   archetypeId: string;
   archetypeSkill: string;
   specificSkill: string;
-  combatTechniques: { attack: string; evade: string; defend: string };
+  combatTechniques: { attack: string; evade: string; defend: string; heal: string };
   editing?: boolean;
   onChangeSpecificSkill?: (skill: string) => void;
-  onChangeCombatTechnique?: (cat: "attack" | "evade" | "defend", tech: string) => void;
+  onChangeCombatTechnique?: (cat: TechniqueCategory, tech: string) => void;
 }
 
 function ExpandableSkill({ name, description, isHomebrew, accentClass = "text-primary" }: { name: string; description?: string; isHomebrew?: boolean; accentClass?: string }) {
@@ -48,7 +49,7 @@ export function SkillsPanel({ archetypeId, archetypeSkill, specificSkill, combat
   const defaultSpecific = SPECIFIC_SKILLS[archetypeId] || [];
 
   const [selectingSpecific, setSelectingSpecific] = useState(false);
-  const [selectingCombat, setSelectingCombat] = useState<"attack" | "evade" | "defend" | null>(null);
+  const [selectingCombat, setSelectingCombat] = useState<TechniqueCategory | null>(null);
 
   const getSpecificDesc = (name: string) => {
     if (SPECIFIC_SKILL_DESCRIPTIONS[name]) return SPECIFIC_SKILL_DESCRIPTIONS[name];
@@ -70,7 +71,7 @@ export function SkillsPanel({ archetypeId, archetypeSkill, specificSkill, combat
     ...brew.getSpecificSkills(archetypeId).map((h) => h.name),
   ];
 
-  const getCombatOptions = (cat: "attack" | "evade" | "defend") => [
+  const getCombatOptions = (cat: TechniqueCategory) => [
     ...COMBAT_TECHNIQUES[cat].options,
     ...brew.getCombatTechniques(cat).map((h) => h.name),
   ];
@@ -142,7 +143,7 @@ export function SkillsPanel({ archetypeId, archetypeSkill, specificSkill, combat
         <h3 className="font-display text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">
           Técnicas de Combate
         </h3>
-        {(["attack", "evade", "defend"] as const).map((cat) => (
+        {TECHNIQUE_CATEGORIES.map((cat) => (
           <div key={cat}>
             <div className="flex items-center justify-between">
               <div className="text-[10px] text-accent uppercase font-mono">{COMBAT_TECHNIQUES[cat].label}</div>

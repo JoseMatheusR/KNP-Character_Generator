@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import type { Character, Attributes, AttributeKey } from "@/types/character";
-import { NEGATIVE_CONDITIONS } from "@/data/gameData";
+import { NEGATIVE_CONDITIONS, POSITIVE_CONDITIONS } from "@/data/gameData";
+import { harmoniaFromSkills, normalizeCharacterBuild, vontadeFromSkills } from "@/lib/characterBuild";
 
 const CHARS_KEY = "kaos-characters";
 
@@ -14,7 +15,7 @@ export function useCharacter(charId?: string | null) {
     try {
       const all = loadAll();
       const found = all.find((c: any) => c.id === charId);
-      return found ? found.data : null;
+      return found ? normalizeCharacterBuild(found.data) : null;
     } catch { return null; }
   });
 
@@ -82,17 +83,19 @@ export function useCharacter(charId?: string | null) {
     if (!character) return null;
     const base: Attributes = {
       foco: character.baseAttributes.foco + character.bonusAttributes.foco,
-      vontade: character.baseAttributes.vontade + character.bonusAttributes.vontade,
-      harmonia: character.baseAttributes.harmonia + character.bonusAttributes.harmonia,
+      vontade: character.baseAttributes.vontade + character.bonusAttributes.vontade + vontadeFromSkills(character),
+      harmonia: character.baseAttributes.harmonia + character.bonusAttributes.harmonia + harmoniaFromSkills(character),
       criatividade: character.baseAttributes.criatividade + character.bonusAttributes.criatividade,
     };
 
     const debuffs: Attributes = { foco: 0, vontade: 0, harmonia: 0, criatividade: 0 };
-    for (const cond of NEGATIVE_CONDITIONS) {
-      if (character.negativeConditions.includes(cond.label)) {
-        for (const [key, val] of Object.entries(cond.effects)) {
-          debuffs[key as AttributeKey] += val!;
-        }
+    for (const cond of [...NEGATIVE_CONDITIONS, ...POSITIVE_CONDITIONS]) {
+      const active = cond.effects && (
+        character.negativeConditions.includes(cond.label) || character.positiveConditions.includes(cond.label)
+      );
+      if (!active || !cond.effects) continue;
+      for (const [key, val] of Object.entries(cond.effects)) {
+        debuffs[key as AttributeKey] += val ?? 0;
       }
     }
 
@@ -107,11 +110,13 @@ export function useCharacter(charId?: string | null) {
   const getDebuffs = useCallback((): Attributes => {
     const debuffs: Attributes = { foco: 0, vontade: 0, harmonia: 0, criatividade: 0 };
     if (!character) return debuffs;
-    for (const cond of NEGATIVE_CONDITIONS) {
-      if (character.negativeConditions.includes(cond.label)) {
-        for (const [key, val] of Object.entries(cond.effects)) {
-          debuffs[key as AttributeKey] += val!;
-        }
+    for (const cond of [...NEGATIVE_CONDITIONS, ...POSITIVE_CONDITIONS]) {
+      const active = cond.effects && (
+        character.negativeConditions.includes(cond.label) || character.positiveConditions.includes(cond.label)
+      );
+      if (!active || !cond.effects) continue;
+      for (const [key, val] of Object.entries(cond.effects)) {
+        debuffs[key as AttributeKey] += val ?? 0;
       }
     }
     return debuffs;

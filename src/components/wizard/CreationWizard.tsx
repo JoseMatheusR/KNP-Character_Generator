@@ -5,7 +5,9 @@ import { WizardStep3 } from "./WizardStep3";
 import { WizardStep4 } from "./WizardStep4";
 import { WizardStep5 } from "./WizardStep5";
 import { ARCHETYPES } from "@/data/gameData";
-import type { Character, Attributes } from "@/types/character";
+import type { Character, Attributes, ExtraTechnique, TechniqueCategory } from "@/types/character";
+import { needsBorrowedSkill, needsExtraEvade, needsExtraTechnique, normalizeCharacterBuild, extraEvadeOptions } from "@/lib/characterBuild";
+import { COMBAT_TECHNIQUE_DESCRIPTIONS } from "@/data/skillDescriptions";
 import { Button } from "@/components/ui/button";
 
 interface Props {
@@ -21,7 +23,10 @@ export function CreationWizard({ onComplete }: Props) {
   const [archetypeId, setArchetypeId] = useState("");
   const [bonusAttributes, setBonusAttributes] = useState<Attributes>({ ...emptyAttrs });
   const [specificSkill, setSpecificSkill] = useState("");
-  const [techniques, setTechniques] = useState({ attack: "", evade: "", defend: "" });
+  const [borrowedSkill, setBorrowedSkill] = useState<string | null>(null);
+  const [extraEvadeTechnique, setExtraEvadeTechnique] = useState<string | null>(null);
+  const [extraTechnique, setExtraTechnique] = useState<ExtraTechnique | null>(null);
+  const [techniques, setTechniques] = useState({ attack: "", evade: "", defend: "", heal: "" });
 
   const archetype = ARCHETYPES.find((a) => a.id === archetypeId);
 
@@ -30,8 +35,13 @@ export function CreationWizard({ onComplete }: Props) {
       case 1: return name.trim().length > 0;
       case 2: return !!archetypeId;
       case 3: return Object.values(bonusAttributes).reduce((s, v) => s + v, 0) === 2;
-      case 4: return !!specificSkill;
-      case 5: return !!techniques.attack && !!techniques.evade && !!techniques.defend;
+      case 4: return !!specificSkill && (!needsBorrowedSkill(specificSkill) || !!borrowedSkill);
+      case 5: {
+        const build = { archetypeSkill: archetype?.skill ?? "", specificSkill, borrowedSkill };
+        return !!techniques.attack && !!techniques.evade && !!techniques.defend && !!techniques.heal
+          && (!needsExtraEvade(build) || (!!extraEvadeTechnique && extraEvadeTechnique !== techniques.evade))
+          && (!needsExtraTechnique(build) || (!!extraTechnique?.name && extraTechnique.name !== techniques[extraTechnique.category]));
+      }
       default: return false;
     }
   };
@@ -40,6 +50,9 @@ export function CreationWizard({ onComplete }: Props) {
     setArchetypeId(id);
     setBonusAttributes({ ...emptyAttrs });
     setSpecificSkill("");
+    setBorrowedSkill(null);
+    setExtraEvadeTechnique(null);
+    setExtraTechnique(null);
   };
 
   const [glitching, setGlitching] = useState(false);
@@ -59,18 +72,23 @@ export function CreationWizard({ onComplete }: Props) {
         bonusAttributes: { ...bonusAttributes },
         archetypeSkill: archetype.skill,
         specificSkill,
+        borrowedSkill,
+        extraEvadeTechnique,
+        extraTechnique,
         combatTechniques: { ...techniques },
         damageMarkers: [],
         negativeConditions: [],
         combatConditions: [],
         positiveConditions: [],
       };
-      onComplete(char);
+      onComplete(normalizeCharacterBuild(char));
     }, 800);
-  }, [archetype, name, origin, archetypeId, bonusAttributes, specificSkill, techniques, onComplete]);
+  }, [archetype, name, origin, archetypeId, bonusAttributes, specificSkill, borrowedSkill, extraEvadeTechnique, extraTechnique, techniques, onComplete]);
 
-  const handleTechniqueSelect = (cat: "attack" | "evade" | "defend", tech: string) => {
+  const handleTechniqueSelect = (cat: TechniqueCategory, tech: string) => {
     setTechniques((prev) => ({ ...prev, [cat]: tech }));
+    if (cat === "evade") setExtraEvadeTechnique((current) => (current === tech ? null : current));
+    setExtraTechnique((current) => (current?.category === cat && current.name === tech ? null : current));
   };
 
   return (
@@ -102,10 +120,47 @@ export function CreationWizard({ onComplete }: Props) {
             />
           )}
           {step === 4 && (
-            <WizardStep4 archetypeId={archetypeId} selected={specificSkill} onSelect={setSpecificSkill} />
+            <WizardStep4
+              archetypeId={archetypeId}
+              selected={specificSkill}
+              borrowedSkill={borrowedSkill}
+              onSelect={(skill) => {
+                setSpecificSkill(skill);
+                if (!needsBorrowedSkill(skill)) setBorrowedSkill(null);
+              }}
+              onBorrow={setBorrowedSkill}
+            />
           )}
           {step === 5 && (
-            <WizardStep5 techniques={techniques} onSelect={handleTechniqueSelect} />
+            <div className="space-y-6">
+              <WizardStep5
+                techniques={techniques}
+                onSelect={handleTechniqueSelect}
+                archetypeSkill={archetype?.skill ?? ""}
+                specificSkill={specificSkill}
+                borrowedSkill={borrowedSkill}
+                extraTechnique={extraTechnique}
+                onExtraTechnique={setExtraTechnique}
+              />
+              {needsExtraEvade({ archetypeSkill: archetype?.skill ?? "", specificSkill, borrowedSkill }) ? (
+                <div className="space-y-2 max-w-lg mx-auto">
+                  <h3 className="font-display text-sm font-bold text-accent uppercase tracking-wider">Marotagem · técnica extra</h3>
+                  {extraEvadeOptions(techniques.evade).map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setExtraEvadeTechnique(opt)}
+                      className={`w-full text-left px-4 py-3 rounded border-2 bg-card font-mono text-sm ${extraEvadeTechnique === opt ? "border-primary text-primary" : "border-border text-foreground"}`}
+                    >
+                      <span className="font-bold">{opt}</span>
+                      {COMBAT_TECHNIQUE_DESCRIPTIONS[opt] ? (
+                        <p className="text-[11px] text-muted-foreground mt-1">{COMBAT_TECHNIQUE_DESCRIPTIONS[opt]}</p>
+                      ) : null}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           )}
         </div>
       </div>

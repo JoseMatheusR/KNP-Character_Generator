@@ -54,7 +54,7 @@ export function CharacterSheet({ charId, onBack }: Props) {
     saveCharacter({ ...character, specificSkill: skill });
   };
 
-  const updateCombatTechnique = (cat: "attack" | "evade" | "defend", tech: string) => {
+  const updateCombatTechnique = (cat: "attack" | "evade" | "defend" | "heal", tech: string) => {
     saveCharacter({ ...character, combatTechniques: { ...character.combatTechniques, [cat]: tech } });
   };
 

@@ -48,9 +48,11 @@ export function ConditionsPanel({ negativeConditions, combatConditions, positive
         </h3>
         {NEGATIVE_CONDITIONS.map((c) => {
           const active = negativeConditions.includes(c.label);
-          const effectsText = Object.entries(c.effects)
-            .map(([k, v]) => `${k.charAt(0).toUpperCase() + k.slice(1)} ${v}`)
-            .join(", ");
+          const effectsText = c.effects
+            ? Object.entries(c.effects)
+                .map(([k, v]) => `${k.charAt(0).toUpperCase() + k.slice(1)} ${v}`)
+                .join(", ")
+            : c.description;
           return (
             <label key={c.label} className="flex items-center gap-3 py-1 cursor-pointer">
               <Checkbox checked={active} onCheckedChange={() => handleNegativeToggle(c.label)} />
@@ -69,11 +71,14 @@ export function ConditionsPanel({ negativeConditions, combatConditions, positive
           Condições de Combate
         </h3>
         {COMBAT_CONDITIONS.map((c) => {
-          const active = combatConditions.includes(c);
+          const active = combatConditions.includes(c.label);
           return (
-            <label key={c} className="flex items-center gap-3 py-1 cursor-pointer">
-              <Checkbox checked={active} onCheckedChange={() => onToggle("combatConditions", c)} />
-              <span className={cn("text-sm font-mono", active ? "text-destructive font-bold" : "text-foreground")}>{c}</span>
+            <label key={c.label} className="flex items-center gap-3 py-1 cursor-pointer">
+              <Checkbox checked={active} onCheckedChange={() => onToggle("combatConditions", c.label)} />
+              <div>
+                <span className={cn("text-sm font-mono", active ? "text-destructive font-bold" : "text-foreground")}>{c.label}</span>
+                <span className="text-[9px] text-muted-foreground ml-2 font-mono">({c.description})</span>
+              </div>
             </label>
           );
         })}
@@ -85,11 +90,14 @@ export function ConditionsPanel({ negativeConditions, combatConditions, positive
           Condições Positivas
         </h3>
         {POSITIVE_CONDITIONS.map((c) => {
-          const active = positiveConditions.includes(c);
+          const active = positiveConditions.includes(c.label);
           return (
-            <label key={c} className="flex items-center gap-3 py-1 cursor-pointer">
-              <Checkbox checked={active} onCheckedChange={() => onToggle("positiveConditions", c)} />
-              <span className={cn("text-sm font-mono", active ? "text-primary font-bold" : "text-foreground")}>{c}</span>
+            <label key={c.label} className="flex items-center gap-3 py-1 cursor-pointer">
+              <Checkbox checked={active} onCheckedChange={() => onToggle("positiveConditions", c.label)} />
+              <div>
+                <span className={cn("text-sm font-mono", active ? "text-primary font-bold" : "text-foreground")}>{c.label}</span>
+                <span className="text-[9px] text-muted-foreground ml-2 font-mono">({c.description})</span>
+              </div>
             </label>
           );
         })}

@@ -1,5 +1,13 @@
-import { ARCHETYPES, SPECIFIC_SKILLS, COMBAT_TECHNIQUES } from "@/data/gameData";
-import type { Character, AttributeKey } from "@/types/character";
+import { ARCHETYPES, SPECIFIC_SKILLS, COMBAT_TECHNIQUES, canSpendAttributePoint } from "@/data/gameData";
+import type { Character, AttributeKey, Attributes } from "@/types/character";
+import {
+  borrowedSkillOptions,
+  extraEvadeOptions,
+  extraTechniqueOptions,
+  needsBorrowedSkill,
+  needsExtraEvade,
+  needsExtraTechnique,
+} from "@/lib/characterBuild";
 
 const FIRST_NAMES = [
   "Zé", "Mariana", "Lampião", "Iracema", "Severino", "Dandara", "Cícero", "Jurema",
@@ -29,17 +37,17 @@ function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-function randomBonus(): Record<AttributeKey, number> {
-  // Distribute 2 bonus points across 4 attributes (each 0, 1 or 2)
+function randomBonus(base: Attributes): Record<AttributeKey, number> {
   const keys: AttributeKey[] = ["foco", "vontade", "harmonia", "criatividade"];
   const bonus: Record<AttributeKey, number> = { foco: 0, vontade: 0, harmonia: 0, criatividade: 0 };
   let points = 2;
-  while (points > 0) {
-    const k = pick(keys);
-    if (bonus[k] < 2) {
-      bonus[k]++;
-      points--;
-    }
+  let guard = 0;
+  while (points > 0 && guard < 40) {
+    guard += 1;
+    const key = pick(keys);
+    if (!canSpendAttributePoint(base, bonus, key)) continue;
+    bonus[key] += 1;
+    points -= 1;
   }
   return bonus;
 }
@@ -49,6 +57,14 @@ export function generateRandomCharacter(): Character {
   const name = `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`;
   const origin = pick(ORIGINS);
   const specificSkill = pick(SPECIFIC_SKILLS[archetype.id] || [""]);
+  const combatTechniques = {
+    attack: pick(COMBAT_TECHNIQUES.attack.options),
+    evade: pick(COMBAT_TECHNIQUES.evade.options),
+    defend: pick(COMBAT_TECHNIQUES.defend.options),
+    heal: pick(COMBAT_TECHNIQUES.heal.options),
+  };
+  const borrowedSkill = needsBorrowedSkill(specificSkill) ? pick(borrowedSkillOptions(archetype.id)) : null;
+  const draft = { archetypeSkill: archetype.skill, specificSkill, borrowedSkill };
 
   return {
     name,
@@ -58,14 +74,18 @@ export function generateRandomCharacter(): Character {
     baseHp: archetype.hp,
     currentHp: archetype.hp,
     baseAttributes: { ...archetype.attributes },
-    bonusAttributes: randomBonus(),
+    bonusAttributes: randomBonus(archetype.attributes),
     archetypeSkill: archetype.skill,
     specificSkill,
-    combatTechniques: {
-      attack: pick(COMBAT_TECHNIQUES.attack.options),
-      evade: pick(COMBAT_TECHNIQUES.evade.options),
-      defend: pick(COMBAT_TECHNIQUES.defend.options),
-    },
+    borrowedSkill,
+    extraEvadeTechnique: needsExtraEvade(draft) ? pick(extraEvadeOptions(combatTechniques.evade)) : null,
+    extraTechnique: needsExtraTechnique(draft)
+      ? (() => {
+          const category = pick(["attack", "defend", "evade", "heal"] as const);
+          return { category, name: pick(extraTechniqueOptions(category, combatTechniques[category])) };
+        })()
+      : null,
+    combatTechniques,
     damageMarkers: [],
     negativeConditions: [],
     combatConditions: [],

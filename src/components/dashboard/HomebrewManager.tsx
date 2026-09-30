@@ -17,6 +17,7 @@ const TYPE_LABELS: Record<SkillType, string> = {
   "combat-attack": "Técnica: Atacar e Avançar",
   "combat-evade": "Técnica: Evadir e Observar",
   "combat-defend": "Técnica: Defender e Manobrar",
+  "combat-heal": "Técnica: Curar e Restaurar",
 };
 
 export function HomebrewManager({ onBack }: Props) {
@@ -62,6 +63,7 @@ export function HomebrewManager({ onBack }: Props) {
     "combat-attack": brew.items.filter((i) => i.type === "combat-attack"),
     "combat-evade": brew.items.filter((i) => i.type === "combat-evade"),
     "combat-defend": brew.items.filter((i) => i.type === "combat-defend"),
+    "combat-heal": brew.items.filter((i) => i.type === "combat-heal"),
   };
 
   return (

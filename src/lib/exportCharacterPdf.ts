@@ -82,6 +82,8 @@ export function exportCharacterPdf(character: Character) {
   doc.text(`${COMBAT_TECHNIQUES.evade.label}: ${character.combatTechniques.evade}`, margin + 10, y);
   y += 14;
   doc.text(`${COMBAT_TECHNIQUES.defend.label}: ${character.combatTechniques.defend}`, margin + 10, y);
+  y += 14;
+  doc.text(`${COMBAT_TECHNIQUES.heal.label}: ${character.combatTechniques.heal || "—"}`, margin + 10, y);
   y += 22;
 
   // Conditions

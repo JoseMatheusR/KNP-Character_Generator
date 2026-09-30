@@ -30,7 +30,7 @@ export function CharacterEditor({ charId, onBack }: Props) {
   const allSpecific = [...defaultSpecific, ...homebrewSpecific];
 
   // Combine default + homebrew combat techniques
-  const getCombatOptions = (cat: "attack" | "evade" | "defend") => {
+  const getCombatOptions = (cat: "attack" | "defend" | "evade" | "heal") => {
     const defaults = COMBAT_TECHNIQUES[cat].options;
     const custom = brew.getCombatTechniques(cat).map((h) => h.name);
     return [...defaults, ...custom];
@@ -58,7 +58,7 @@ export function CharacterEditor({ charId, onBack }: Props) {
     setDraft((prev) => prev ? { ...prev, [key]: value } : prev);
   };
 
-  const updateTechnique = (cat: "attack" | "evade" | "defend", value: string) => {
+  const updateTechnique = (cat: "attack" | "defend" | "evade" | "heal", value: string) => {
     setDraft((prev) => prev ? { ...prev, combatTechniques: { ...prev.combatTechniques, [cat]: value } } : prev);
   };
 
@@ -132,7 +132,7 @@ export function CharacterEditor({ charId, onBack }: Props) {
             Técnicas de Combate
           </h3>
 
-          {(["attack", "evade", "defend"] as const).map((cat) => {
+          {(["attack", "defend", "evade", "heal"] as const).map((cat) => {
             const options = getCombatOptions(cat);
             const defaultOpts = COMBAT_TECHNIQUES[cat].options;
             return (

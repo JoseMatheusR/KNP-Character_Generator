@@ -1,17 +1,32 @@
-import { COMBAT_TECHNIQUES } from "@/data/gameData";
+import { COMBAT_TECHNIQUES, TECHNIQUE_CATEGORIES } from "@/data/gameData";
+import type { ExtraTechnique, TechniqueCategory } from "@/types/character";
+import { extraTechniqueOptions, needsExtraTechnique } from "@/lib/characterBuild";
 import { COMBAT_TECHNIQUE_DESCRIPTIONS } from "@/data/skillDescriptions";
 import { useHomebrew } from "@/hooks/useHomebrew";
 import { cn } from "@/lib/utils";
 
 interface Props {
-  techniques: { attack: string; evade: string; defend: string };
-  onSelect: (category: "attack" | "evade" | "defend", technique: string) => void;
+  techniques: { attack: string; evade: string; defend: string; heal: string };
+  onSelect: (category: TechniqueCategory, technique: string) => void;
+  archetypeSkill: string;
+  specificSkill: string;
+  borrowedSkill: string | null;
+  extraTechnique: ExtraTechnique | null;
+  onExtraTechnique: (technique: ExtraTechnique) => void;
 }
 
-export function WizardStep5({ techniques, onSelect }: Props) {
+export function WizardStep5({
+  techniques,
+  onSelect,
+  archetypeSkill,
+  specificSkill,
+  borrowedSkill,
+  extraTechnique,
+  onExtraTechnique,
+}: Props) {
   const brew = useHomebrew();
 
-  const getOptions = (cat: "attack" | "evade" | "defend") => {
+  const getOptions = (cat: TechniqueCategory) => {
     const defaults = COMBAT_TECHNIQUES[cat].options.map((o) => ({
       name: o, description: COMBAT_TECHNIQUE_DESCRIPTIONS[o] || "", homebrew: false,
     }));
@@ -27,10 +42,10 @@ export function WizardStep5({ techniques, onSelect }: Props) {
         <h2 className="font-display text-2xl font-bold text-primary text-glow mb-1">
           {'>'} TÉCNICAS DE COMBATE
         </h2>
-        <p className="text-muted-foreground text-xs">Passo 5 de 5 — Escolha 1 técnica por ação</p>
+        <p className="text-muted-foreground text-xs">Passo 5 de 5 — Escolha 1 técnica para cada uma das 4 ações</p>
       </div>
 
-      {(["attack", "evade", "defend"] as const).map((cat) => {
+      {TECHNIQUE_CATEGORIES.map((cat) => {
         const options = getOptions(cat);
         return (
           <div key={cat} className="space-y-2">
@@ -65,6 +80,34 @@ export function WizardStep5({ techniques, onSelect }: Props) {
           </div>
         );
       })}
+      {needsExtraTechnique({ archetypeSkill, specificSkill, borrowedSkill }) ? (
+        <div className="space-y-2">
+          <h3 className="font-display text-sm font-bold text-accent uppercase tracking-wider">
+            Kryptônia · técnica extra
+          </h3>
+          <p className="text-[11px] text-muted-foreground">Escolha mais uma técnica de qualquer tipo, diferente da principal.</p>
+          {TECHNIQUE_CATEGORIES.map((category) => (
+            <div key={category} className="space-y-2">
+              <div className="text-[10px] font-mono uppercase text-muted-foreground">{COMBAT_TECHNIQUES[category].label}</div>
+              {extraTechniqueOptions(category, techniques[category]).map((opt) => (
+                <button
+                  key={`${category}-${opt}`}
+                  type="button"
+                  onClick={() => onExtraTechnique({ category, name: opt })}
+                  className={cn(
+                    "w-full text-left px-4 py-3 rounded border-2 bg-card font-mono text-sm transition-none",
+                    extraTechnique?.category === category && extraTechnique.name === opt
+                      ? "border-primary border-glow text-primary"
+                      : "border-border hover:border-muted-foreground text-foreground"
+                  )}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

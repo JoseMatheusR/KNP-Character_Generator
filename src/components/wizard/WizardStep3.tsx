@@ -1,5 +1,5 @@
 import type { Attributes, AttributeKey } from "@/types/character";
-import { ATTRIBUTE_LABELS } from "@/data/gameData";
+import { ATTRIBUTE_LABELS, canSpendAttributePoint } from "@/data/gameData";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -15,7 +15,7 @@ export function WizardStep3({ baseAttributes, bonusAttributes, onBonusChange }: 
   const remaining = MAX_BONUS - totalUsed;
 
   const handleAdd = (key: AttributeKey) => {
-    if (remaining <= 0) return;
+    if (!canSpendAttributePoint(baseAttributes, bonusAttributes, key)) return;
     onBonusChange({ ...bonusAttributes, [key]: bonusAttributes[key] + 1 });
   };
 
@@ -30,7 +30,7 @@ export function WizardStep3({ baseAttributes, bonusAttributes, onBonusChange }: 
         <h2 className="font-display text-2xl font-bold text-primary text-glow mb-1">
           {'>'} DISTRIBUIÇÃO DE ATRIBUTOS
         </h2>
-        <p className="text-muted-foreground text-xs">Passo 3 de 5 — Distribua 2 pontos extras</p>
+        <p className="text-muted-foreground text-xs">Passo 3 de 5 — Distribua 2 pontos extras. O atributo final não passa de +3.</p>
       </div>
 
       <div className="text-center border border-border rounded p-3 bg-card">
@@ -70,7 +70,7 @@ export function WizardStep3({ baseAttributes, bonusAttributes, onBonusChange }: 
                 <button
                   type="button"
                   onClick={() => handleAdd(key)}
-                  disabled={remaining <= 0}
+                  disabled={!canSpendAttributePoint(baseAttributes, bonusAttributes, key)}
                   className="w-8 h-8 border border-border rounded bg-secondary text-foreground font-bold disabled:opacity-30 hover:border-primary transition-none"
                 >
                   +
