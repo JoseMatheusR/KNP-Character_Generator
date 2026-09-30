@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View, Pressable } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Animated, KeyboardAvoidingView, Platform, ScrollView, Text, View, Pressable } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ARCHETYPES, SPECIFIC_SKILLS, COMBAT_TECHNIQUES, TECHNIQUE_CATEGORIES, canSpendAttributePoint } from "@/src/domain/gameData";
 import { COMBAT_TECHNIQUE_DESCRIPTIONS, SPECIFIC_SKILL_DESCRIPTIONS } from "@/src/domain/skillDescriptions";
@@ -41,6 +41,18 @@ export function CreationWizard({ onComplete, onCancel }: Props) {
   const [extraEvadeTechnique, setExtraEvadeTechnique] = useState<string | null>(null);
   const [extraTechnique, setExtraTechnique] = useState<ExtraTechnique | null>(null);
   const [techniques, setTechniques] = useState({ attack: "", evade: "", defend: "", heal: "" });
+  const [creating, setCreating] = useState(false);
+  const stepEnter = useRef(new Animated.Value(0)).current;
+  const progress = useRef(new Animated.Value(step / 5)).current;
+  const createPulse = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    stepEnter.setValue(0);
+    Animated.parallel([
+      Animated.timing(progress, { toValue: step / 5, duration: 220, useNativeDriver: false }),
+      Animated.timing(stepEnter, { toValue: 1, duration: 220, useNativeDriver: true }),
+    ]).start();
+  }, [progress, step, stepEnter]);
 
   const archetype = ARCHETYPES.find((a) => a.id === archetypeId);
   const spentPoints = Object.values(bonusAttributes).reduce((sum, value) => sum + value, 0);
@@ -73,7 +85,7 @@ export function CreationWizard({ onComplete, onCancel }: Props) {
   };
 
   const handleFinish = () => {
-    if (!archetype) return;
+    if (!archetype || creating) return;
     const char: Character = {
       name,
       origin,
@@ -94,7 +106,11 @@ export function CreationWizard({ onComplete, onCancel }: Props) {
       combatConditions: [],
       positiveConditions: [],
     };
-    onComplete(normalizeCharacterBuild(char));
+    setCreating(true);
+    Animated.sequence([
+      Animated.timing(createPulse, { toValue: 1.06, duration: 120, useNativeDriver: true }),
+      Animated.timing(createPulse, { toValue: 1, duration: 160, useNativeDriver: true }),
+    ]).start(() => onComplete(normalizeCharacterBuild(char)));
   };
 
   const adjustBonus = (key: AttributeKey, delta: number) => {
@@ -165,7 +181,13 @@ export function CreationWizard({ onComplete, onCancel }: Props) {
             <Text className="font-mono text-xs text-terminal">SYS {Math.round((step / 5) * 100)}%</Text>
           </View>
           <View className="h-2 overflow-hidden border border-border bg-muted">
-            <View className="h-full bg-primary" style={{ width: `${(step / 5) * 100}%` }} />
+            <Animated.View
+              style={{
+                height: "100%",
+                backgroundColor: "#D05E3E",
+                width: progress.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] }),
+              }}
+            />
           </View>
         </View>
         </View>
@@ -177,6 +199,12 @@ export function CreationWizard({ onComplete, onCancel }: Props) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        <Animated.View
+          style={{
+            opacity: stepEnter,
+            transform: [{ translateY: stepEnter.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }],
+          }}
+        >
         <View className="w-full max-w-[720px] self-center gap-5 p-4 pb-8">
         {step === 1 && (
           <View className="gap-4">
@@ -445,6 +473,7 @@ export function CreationWizard({ onComplete, onCancel }: Props) {
           </View>
         )}
         </View>
+        </Animated.View>
       </ScrollView>
 
       <View
@@ -466,7 +495,9 @@ export function CreationWizard({ onComplete, onCancel }: Props) {
             className="flex-1"
           />
         ) : (
-          <Button label="Criar agente" disabled={!canNext()} onPress={handleFinish} className="flex-1" />
+          <Animated.View style={{ flex: 1, transform: [{ scale: createPulse }] }}>
+            <Button label="Criar agente" disabled={!canNext() || creating} onPress={handleFinish} className="w-full" />
+          </Animated.View>
         )}
         </View>
       </View>
