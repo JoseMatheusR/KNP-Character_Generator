@@ -14,6 +14,10 @@ npm install
 npm run dev
 ```
 
+## App mobile (Expo)
+
+Ver [`mobile/README.md`](mobile/README.md).
+
 ## Scripts
 
 - `npm run dev` — servidor de desenvolvimento
