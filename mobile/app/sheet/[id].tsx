@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useCharacter } from "@/src/hooks/useCharacter";
 import {
@@ -25,7 +25,7 @@ import {
   needsExtraTechnique,
   normalizeCharacterBuild,
 } from "@/src/domain/characterBuild";
-import { getBuiltAttributes } from "@/src/domain/characterRules";
+import { conditionsReplacedBy, getBuiltAttributes } from "@/src/domain/characterRules";
 import {
   ARCHETYPE_SKILL_DESCRIPTIONS,
   COMBAT_TECHNIQUE_DESCRIPTIONS,
@@ -55,6 +55,53 @@ function signed(value: number) {
   return value >= 0 ? `+${value}` : String(value);
 }
 
+function ConditionChip({
+  label,
+  on,
+  pulse,
+  leaving,
+  onPress,
+}: {
+  label: string;
+  on: boolean;
+  pulse: boolean;
+  leaving: boolean;
+  onPress: () => void;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!pulse) return;
+    Animated.sequence([
+      Animated.timing(scale, { toValue: 1.08, duration: 90, useNativeDriver: true }),
+      Animated.timing(scale, { toValue: 1, duration: 140, useNativeDriver: true }),
+    ]).start();
+  }, [pulse, scale]);
+
+  useEffect(() => {
+    if (!leaving) {
+      opacity.setValue(1);
+      return;
+    }
+    Animated.timing(opacity, { toValue: 0, duration: 160, useNativeDriver: true }).start();
+  }, [leaving, opacity]);
+
+  return (
+    <Animated.View style={{ transform: [{ scale }], opacity }}>
+      <Pressable
+        onPress={onPress}
+        className={cn(
+          "min-h-[40px] justify-center border px-3 py-2",
+          on ? "border-primary bg-primary-soft" : "border-border bg-card-strong"
+        )}
+      >
+        <Text className={cn("font-mono text-xs", on ? "text-sand" : "text-foreground")}>{label}</Text>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
 export default function SheetScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const charId = id!;
@@ -63,6 +110,99 @@ export default function SheetScreen() {
   const brew = useHomebrew();
   const [editing, setEditing] = useState(false);
   const [page, setPage] = useState<SheetPage>("mesa");
+  const [shownHp, setShownHp] = useState<number | null>(null);
+  const [pulseLabel, setPulseLabel] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState<string[]>([]);
+  const leaveX = useRef(new Animated.Value(0)).current;
+  const enterX = useRef(new Animated.Value(0)).current;
+  const [paneWidth, setPaneWidth] = useState(0);
+  const [paneHeight, setPaneHeight] = useState(0);
+  const [outgoing, setOutgoing] = useState<SheetPage | null>(null);
+  const [slideToken, setSlideToken] = useState(0);
+  const direction = useRef<1 | -1>(1);
+  const sliding = useRef(false);
+  const awaitingLayout = useRef(false);
+  const animatedToken = useRef(0);
+  const dim = useRef(new Animated.Value(0)).current;
+  const hpScale = useRef(new Animated.Value(1)).current;
+  const previousHp = useRef<number | null>(null);
+  const [hpTone, setHpTone] = useState<"up" | "down" | null>(null);
+
+  useEffect(() => {
+    if (!character) return;
+    if (editing || shownHp === null) {
+      setShownHp(character.currentHp);
+      return;
+    }
+    if (shownHp === character.currentHp) return;
+    const timer = setTimeout(() => {
+      setShownHp((value) => (value === null ? character.currentHp : value + Math.sign(character.currentHp - value)));
+    }, 70);
+    return () => clearTimeout(timer);
+  }, [character, shownHp, editing]);
+
+  useEffect(() => {
+    if (!character) return;
+    const previous = previousHp.current;
+    previousHp.current = character.currentHp;
+    if (editing || previous === null || previous === character.currentHp) return;
+    setHpTone(character.currentHp < previous ? "down" : "up");
+    hpScale.setValue(1.22);
+    Animated.spring(hpScale, { toValue: 1, useNativeDriver: true, speed: 16, bounciness: 8 }).start();
+    const clearTone = setTimeout(() => setHpTone(null), 360);
+    if (previous > 0 && character.currentHp === 0) {
+      dim.setValue(0);
+      Animated.sequence([
+        Animated.timing(dim, { toValue: 0.62, duration: 120, useNativeDriver: true }),
+        Animated.timing(dim, { toValue: 0, duration: 340, useNativeDriver: true }),
+      ]).start();
+    }
+    return () => clearTimeout(clearTone);
+  }, [character, editing, dim, hpScale]);
+
+  const showPage = (next: SheetPage) => {
+    if (next === page || sliding.current || paneWidth === 0) return;
+    const from = PAGES.findIndex((item) => item.id === page);
+    const to = PAGES.findIndex((item) => item.id === next);
+    const forward = to > from;
+    direction.current = forward ? 1 : -1;
+    leaveX.setValue(0);
+    enterX.setValue(forward ? paneWidth : -paneWidth);
+    awaitingLayout.current = true;
+    sliding.current = true;
+    setOutgoing(page);
+    setPage(next);
+  };
+
+  const onIncomingLayout = (height: number) => {
+    if (!awaitingLayout.current || height <= 0) return;
+    awaitingLayout.current = false;
+    setPaneHeight(height);
+    setSlideToken((token) => token + 1);
+  };
+
+  useLayoutEffect(() => {
+    if (slideToken === 0 || slideToken === animatedToken.current || paneWidth === 0) return;
+    animatedToken.current = slideToken;
+    const forward = direction.current === 1;
+    leaveX.setValue(0);
+    enterX.setValue(forward ? paneWidth : -paneWidth);
+    Animated.parallel([
+      Animated.timing(leaveX, {
+        toValue: forward ? -paneWidth : paneWidth,
+        duration: 140,
+        useNativeDriver: true,
+      }),
+      Animated.timing(enterX, {
+        toValue: 0,
+        duration: 140,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      sliding.current = false;
+      setOutgoing(null);
+    });
+  }, [enterX, leaveX, paneWidth, slideToken]);
 
   if (loading || !character) {
     return (
@@ -150,33 +290,50 @@ export default function SheetScreen() {
     <View className="gap-2">
       <Text className="font-display text-xs font-bold uppercase tracking-wider text-muted-foreground">{title}</Text>
       <View className="flex-row flex-wrap gap-2">
-        {items.map((item) => {
-          const on = character[type].includes(item.label);
-          return (
-            <Pressable
-              key={item.label}
-              onPress={() => toggleCondition(type, item.label)}
-              className={cn(
-                "min-h-[40px] justify-center border px-3 py-2",
-                on ? "border-primary bg-primary-soft" : "border-border bg-card-strong"
-              )}
-            >
-              <Text className={cn("font-mono text-xs", on ? "text-sand" : "text-foreground")}>{item.label}</Text>
-            </Pressable>
-          );
-        })}
+        {items.map((item) => (
+          <ConditionChip
+            key={item.label}
+            label={item.label}
+            on={character[type].includes(item.label)}
+            pulse={pulseLabel === item.label}
+            leaving={leaving.includes(item.label)}
+            onPress={() => {
+              const active = character[type].includes(item.label);
+              if (active) {
+                toggleCondition(type, item.label);
+                return;
+              }
+              const dropped = conditionsReplacedBy(item.label).filter((name) =>
+                [...character.negativeConditions, ...character.combatConditions, ...character.positiveConditions].includes(name)
+              );
+              if (dropped.length === 0) {
+                toggleCondition(type, item.label);
+                setPulseLabel(item.label);
+                return;
+              }
+              setLeaving(dropped);
+              setTimeout(() => {
+                toggleCondition(type, item.label);
+                setLeaving([]);
+                setPulseLabel(item.label);
+              }, 170);
+            }}
+          />
+        ))}
       </View>
       {items
         .filter((item) => character[type].includes(item.label))
         .map((item) => (
           <Text key={`${item.label}-efeito`} className="font-mono text-xs leading-5 text-muted-foreground">
             {item.label}: {item.description}
+            {item.overcome ? `\nSuperação: ${item.overcome}` : ""}
           </Text>
         ))}
     </View>
   );
 
   return (
+    <View className="flex-1 bg-background">
     <Screen maxWidth={800} avoidKeyboard>
       {editing ? (
         <View className="border border-accent bg-card px-4 py-3">
@@ -212,7 +369,7 @@ export default function SheetScreen() {
               key={item.id}
               accessibilityRole="tab"
               accessibilityState={{ selected }}
-              onPress={() => setPage(item.id)}
+              onPress={() => showPage(item.id)}
               className={cn("min-h-[44px] flex-1 items-center justify-center", selected ? "bg-primary" : "bg-card")}
             >
               <Text numberOfLines={1} className={cn("font-mono text-[10px] font-bold", selected ? "text-background" : "text-muted-foreground")}>
@@ -223,14 +380,52 @@ export default function SheetScreen() {
         })}
       </View>
 
-      {page === "mesa" ? (
+      <View
+        style={{ overflow: "hidden", height: paneHeight || undefined }}
+        onLayout={(event) => {
+          const width = event.nativeEvent.layout.width;
+          setPaneWidth((current) => (Math.abs(width - current) < 1 ? current : width));
+        }}
+      >
+      {(outgoing ? [outgoing, page] : [page]).map((active) => {
+        const entering = Boolean(outgoing) && active === page;
+        const leaving = active === outgoing;
+        return (
+      <Animated.View
+        key={active}
+        pointerEvents={leaving ? "none" : "auto"}
+        style={{
+          position: paneHeight ? "absolute" : "relative",
+          top: 0,
+          left: 0,
+          width: paneWidth || "100%",
+          transform: [{ translateX: leaving ? leaveX : entering ? enterX : 0 }],
+        }}
+        onLayout={(event) => {
+          const height = event.nativeEvent.layout.height;
+          if (entering) {
+            onIncomingLayout(height);
+            return;
+          }
+          if (!outgoing && height > 0) {
+            setPaneHeight((current) => (Math.abs(height - current) < 1 ? current : height));
+          }
+        }}
+      >
+      {active === "mesa" ? (
       <View className="gap-4">
       <Card className="flex-row items-center justify-between border-primary">
         <View>
           <Text className="font-display text-xs font-bold uppercase tracking-wider text-muted-foreground">Pontos de vida</Text>
-          <Text className="mt-1 font-mono text-2xl font-bold text-foreground">
-            {character.currentHp}<Text className="text-muted-foreground"> / {character.baseHp}</Text>
-          </Text>
+          <Animated.Text
+            className="mt-1 font-mono text-2xl font-bold"
+            style={{
+              color: hpTone === "down" ? "#E05A47" : hpTone === "up" ? "#9FBA72" : "#F2E7CF",
+              transform: [{ scale: editing ? 1 : hpScale }],
+            }}
+          >
+            {shownHp ?? character.currentHp}<Text className="text-muted-foreground"> / {character.baseHp}</Text>
+          </Animated.Text>
         </View>
         <View className="flex-row items-center gap-3">
           <Pressable onPress={() => updateHp(-1)} className="h-12 w-12 items-center justify-center border border-border bg-muted">
@@ -256,7 +451,7 @@ export default function SheetScreen() {
         </View>
       </Card>
 
-      <Pressable onPress={() => setPage("estado")} className="border border-border bg-card px-4 py-3">
+      <Pressable onPress={() => showPage("estado")} className="border border-border bg-card px-4 py-3">
         <Text className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Estado ativo</Text>
         <Text className="mt-1 font-mono text-sm text-foreground">
           {activeConditions.length > 0 ? activeConditions.join(" · ") : "Nenhuma condição"}
@@ -267,7 +462,7 @@ export default function SheetScreen() {
       </View>
       ) : null}
 
-      {page === "tecnicas" ? (
+      {active === "tecnicas" ? (
       <View className="gap-4">
       <Card className="gap-3">
         <SectionHeading title="Técnicas" description="As que este agente pode usar, com o texto." />
@@ -437,7 +632,7 @@ export default function SheetScreen() {
       </View>
       ) : null}
 
-      {page === "estado" ? (
+      {active === "estado" ? (
       <View className="gap-4">
       <Card className="gap-5">
         <SectionHeading title="Condições" description="Toque para ativar ou remover." />
@@ -466,7 +661,7 @@ export default function SheetScreen() {
       </View>
       ) : null}
 
-      {page === "notas" ? (
+      {active === "notas" ? (
       <Card>
         <SectionHeading title="Notas" description="Sessão, inventário, contatos." />
         <Input
@@ -478,6 +673,12 @@ export default function SheetScreen() {
         />
       </Card>
       ) : null}
+      </Animated.View>
+        );
+      })}
+      </View>
     </Screen>
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: "#000", opacity: dim }]} />
+    </View>
   );
 }
