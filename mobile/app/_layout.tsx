@@ -1,11 +1,25 @@
 import { useFonts } from "expo-font";
-import { Stack } from "expo-router";
+import { DarkTheme, Stack, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
+import { View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "react-native-reanimated";
 import "../global.css";
+
+const navigationTheme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    background: "#0B0B09",
+    card: "#15130F",
+    text: "#E0BE83",
+    border: "#7D6C58",
+    primary: "#D05E3E",
+    notification: "#D05E3E",
+  },
+};
 
 SplashScreen.preventAutoHideAsync();
 
@@ -27,6 +41,8 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <StatusBar style="light" />
+      <View style={{ flex: 1, backgroundColor: "#0B0B09" }}>
+      <ThemeProvider value={navigationTheme}>
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: "#15130F" },
@@ -42,6 +58,8 @@ export default function RootLayout() {
         <Stack.Screen name="sheet/[id]" options={{ title: "> REGISTRO_AGENTE" }} />
         <Stack.Screen name="homebrew" options={{ title: "> ARQUIVO_HOMEBREW" }} />
       </Stack>
+      </ThemeProvider>
+      </View>
     </SafeAreaProvider>
   );
 }
