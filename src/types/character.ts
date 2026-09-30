@@ -20,7 +20,11 @@ export interface Character {
     attack: string;
     evade: string;
     defend: string;
+    heal: string;
   };
+  borrowedSkill?: string | null;
+  extraEvadeTechnique?: string | null;
+  extraTechnique?: ExtraTechnique | null;
   damageMarkers: string[];
   negativeConditions: string[];
   combatConditions: string[];
@@ -29,3 +33,10 @@ export interface Character {
 }
 
 export type AttributeKey = keyof Attributes;
+
+export type TechniqueCategory = "attack" | "defend" | "evade" | "heal";
+
+export interface ExtraTechnique {
+  category: TechniqueCategory;
+  name: string;
+}

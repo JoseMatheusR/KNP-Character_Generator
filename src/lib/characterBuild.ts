@@ -1,5 +1,5 @@
-import type { Character, ExtraTechnique, TechniqueCategory } from "./character";
-import { ARCHETYPES, COMBAT_TECHNIQUES, SPECIFIC_SKILLS, TECHNIQUE_CATEGORIES } from "./gameData";
+import type { Character, ExtraTechnique, TechniqueCategory } from "@/types/character";
+import { ARCHETYPES, COMBAT_TECHNIQUES, SPECIFIC_SKILLS, TECHNIQUE_CATEGORIES } from "@/data/gameData";
 
 export const SAGA_SKILL = "Saga de um vaqueiro";
 export const MAROTAGEM_SKILL = "Marotagem";

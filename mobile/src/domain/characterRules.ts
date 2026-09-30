@@ -1,23 +1,27 @@
 import type { Attributes, AttributeKey, Character } from "./character";
-import { harmoniaFromSkills } from "./characterBuild";
-import { NEGATIVE_CONDITIONS } from "./gameData";
+import { harmoniaFromSkills, vontadeFromSkills } from "./characterBuild";
+import { NEGATIVE_CONDITIONS, POSITIVE_CONDITIONS, type ConditionEffect } from "./gameData";
+
+function addEffects(total: Attributes, conditions: ConditionEffect[], active: string[]) {
+  for (const condition of conditions) {
+    if (!condition.effects || !active.includes(condition.label)) continue;
+    for (const [key, value] of Object.entries(condition.effects)) {
+      total[key as AttributeKey] += value ?? 0;
+    }
+  }
+}
 
 export function getDebuffs(character: Character): Attributes {
   const debuffs: Attributes = { foco: 0, vontade: 0, harmonia: 0, criatividade: 0 };
-  for (const cond of NEGATIVE_CONDITIONS) {
-    if (character.negativeConditions.includes(cond.label)) {
-      for (const [key, val] of Object.entries(cond.effects)) {
-        debuffs[key as AttributeKey] += val!;
-      }
-    }
-  }
+  addEffects(debuffs, NEGATIVE_CONDITIONS, character.negativeConditions);
+  addEffects(debuffs, POSITIVE_CONDITIONS, character.positiveConditions);
   return debuffs;
 }
 
 export function getBuiltAttributes(character: Character): Attributes {
   return {
     foco: character.baseAttributes.foco + character.bonusAttributes.foco,
-    vontade: character.baseAttributes.vontade + character.bonusAttributes.vontade,
+    vontade: character.baseAttributes.vontade + character.bonusAttributes.vontade + vontadeFromSkills(character),
     harmonia: character.baseAttributes.harmonia + character.bonusAttributes.harmonia + harmoniaFromSkills(character),
     criatividade: character.baseAttributes.criatividade + character.bonusAttributes.criatividade,
   };

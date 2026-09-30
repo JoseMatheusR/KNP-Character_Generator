@@ -20,11 +20,14 @@ export interface Character {
     attack: string;
     evade: string;
     defend: string;
+    heal: string;
   };
   /** Perícia de outro arquétipo, escolhida por Saga de um vaqueiro. */
   borrowedSkill?: string | null;
   /** Segunda técnica de Evadir e Observar, escolhida por Marotagem. */
   extraEvadeTechnique?: string | null;
+  /** Técnica extra de qualquer tipo, escolhida por Kryptônia. */
+  extraTechnique?: ExtraTechnique | null;
   damageMarkers: string[];
   negativeConditions: string[];
   combatConditions: string[];
@@ -33,3 +36,10 @@ export interface Character {
 }
 
 export type AttributeKey = keyof Attributes;
+
+export type TechniqueCategory = "attack" | "defend" | "evade" | "heal";
+
+export interface ExtraTechnique {
+  category: TechniqueCategory;
+  name: string;
+}
