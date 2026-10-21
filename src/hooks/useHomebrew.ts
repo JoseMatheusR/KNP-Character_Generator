@@ -1,54 +1,61 @@
-import { useState, useCallback } from "react";
-
-export interface HomebrewSkill {
-  id: string;
-  name: string;
-  description: string;
-  type: "specific" | "combat-attack" | "combat-evade" | "combat-defend" | "combat-heal";
-  archetypeId?: string; // only for specific skills
-}
-
-const HOMEBREW_KEY = "kaos-homebrew";
-
-function load(): HomebrewSkill[] {
-  try { return JSON.parse(localStorage.getItem(HOMEBREW_KEY) || "[]"); } catch { return []; }
-}
-function save(items: HomebrewSkill[]) {
-  localStorage.setItem(HOMEBREW_KEY, JSON.stringify(items));
-}
+import { useCallback, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import * as homebrewStorage from "@/src/storage/homebrew";
+import type { HomebrewSkill } from "@/src/storage/homebrew";
 
 export function useHomebrew() {
-  const [items, setItems] = useState<HomebrewSkill[]>(load);
+  const [items, setItems] = useState<HomebrewSkill[]>([]);
 
-  const refresh = useCallback(() => setItems(load()), []);
-
-  const add = useCallback((item: Omit<HomebrewSkill, "id">) => {
-    const entry: HomebrewSkill = { ...item, id: crypto.randomUUID() };
-    const all = [...load(), entry];
-    save(all);
-    setItems(all);
-    return entry;
+  const refresh = useCallback(async () => {
+    setItems(await homebrewStorage.loadHomebrew());
   }, []);
 
-  const update = useCallback((id: string, data: Partial<Omit<HomebrewSkill, "id">>) => {
-    const all = load().map((i) => i.id === id ? { ...i, ...data } : i);
-    save(all);
-    setItems(all);
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh])
+  );
 
-  const remove = useCallback((id: string) => {
-    const all = load().filter((i) => i.id !== id);
-    save(all);
-    setItems(all);
-  }, []);
+  const add = useCallback(
+    async (item: Omit<HomebrewSkill, "id">) => {
+      const entry = await homebrewStorage.addHomebrew(item);
+      await refresh();
+      return entry;
+    },
+    [refresh]
+  );
 
-  const getSpecificSkills = useCallback((archetypeId?: string) => {
-    return items.filter((i) => i.type === "specific" && (!archetypeId || !i.archetypeId || i.archetypeId === archetypeId));
-  }, [items]);
+  const update = useCallback(
+    async (id: string, data: Partial<Omit<HomebrewSkill, "id">>) => {
+      await homebrewStorage.updateHomebrew(id, data);
+      await refresh();
+    },
+    [refresh]
+  );
 
-  const getCombatTechniques = useCallback((category: "attack" | "defend" | "evade" | "heal") => {
-    return items.filter((i) => i.type === `combat-${category}`);
-  }, [items]);
+  const remove = useCallback(
+    async (id: string) => {
+      await homebrewStorage.removeHomebrew(id);
+      await refresh();
+    },
+    [refresh]
+  );
+
+  const getSpecificSkills = useCallback(
+    (archetypeId?: string) =>
+      items.filter(
+        (i) =>
+          i.type === "specific" &&
+          (!archetypeId || !i.archetypeId || i.archetypeId === archetypeId)
+      ),
+    [items]
+  );
+
+  const getCombatTechniques = useCallback(
+    (category: "attack" | "defend" | "evade" | "heal") =>
+      items.filter((i) => i.type === `combat-${category}`),
+    [items]
+  );
 
   return { items, add, update, remove, refresh, getSpecificSkills, getCombatTechniques };
 }
