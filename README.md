@@ -1,27 +1,23 @@
 # Kaos em Nova Patos (KNP)
 
-App mobile para criar e gerenciar fichas de personagens do RPG Kaos em Nova Patos.
-
-## Stack
-
-- Vite + React + TypeScript
-- Tailwind CSS + shadcn/ui
+App React Native (Expo) para criar e gerenciar fichas do RPG Kaos em Nova Patos.
 
 ## Desenvolvimento
 
 ```sh
 npm install
-npm run dev
+npm run start
 ```
 
-## App mobile (Expo)
-
-Ver [`mobile/README.md`](mobile/README.md).
+Escaneie o QR code com o **Expo Go** (Android/iOS).
 
 ## Scripts
 
-- `npm run dev` — servidor de desenvolvimento
-- `npm run build` — build de produção
-- `npm run preview` — preview do build
-- `npm run test` — testes (Vitest)
-- `npm run lint` — ESLint
+- `npm run start` — Metro + Expo
+- `npm run android` / `npm run ios` — abrir no emulador
+- `npm test` — testes de regras (Vitest)
+- `npm run lint` — ESLint (Expo)
+
+## Dados
+
+Fichas, homebrew e histórico de dados ficam no dispositivo (AsyncStorage).
